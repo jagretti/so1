@@ -1,0 +1,29 @@
+{ ok , Sock } = gen_tcp:connect(localhost, 8000, []).
+
+gen_tcp:send(Sock, "abc").
+
+prueba:init().
+
+
+DUDAS PARA GUIDO
+
+1) un psocket debe responder a todos los comandos del mismo cliente toda la partida??
+o debe crear nuevos procesos/hilos?? Si 
+
+2) pcomando es un nuevo proceso o simplemente una funcion que responde dependiendo
+del comando recibido??
+
+3) es normal que para distintos clientes nos de el mismo socket??, no, es un socket x cliente pero lo q vemos no es el num de socket
+
+4) Jugadas
+
+Operaciones: band bor bxor 
+VER
+learnyousomeerlang.com/buckets-of-sockets
+
+
+Ver >inet:i().
+
+HACER UN SPAWN PARA USAR INET, asi se corre en segundo plano.
+
+
