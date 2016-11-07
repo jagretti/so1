@@ -26,4 +26,38 @@ Ver >inet:i().
 
 HACER UN SPAWN PARA USAR INET, asi se corre en segundo plano.
 
+Para comunicarnos entre servidores necesitamos el hostname, y en caso de ser localhost, el listenSock correspondiente.
+Entonces, deberiamos crear una tabla con los servidores actuales y sus direcciones, que deberia estar en cada servidor,
+y cuando un servidor se suma.
+
+VER FOTO, SECRETO DE LA VIDA ADENTRO.
+
+Usar register para identificar las funciones con un id unico y pasandole su pid. Previamente a usar register usar 
+net_kernel:connect_node(nodo@lalal).
+
+
+SERVER -> Dispatcher
+          Comunicacion entre ellos
+          lanzar psocket -> lanza pcomando
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

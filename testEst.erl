@@ -9,12 +9,12 @@ connectNodes(ListServers) ->
     lists:map(fun(Name) -> net_kernel:connect_node(Name) end, ListServers).
 
 pstat(ListServers) ->
-    register(stats, self()),
+    register(pstatx, self()),
     loopPstat(ListServers).
 
 loopPstat(ListServers) ->
     receive after 5000 -> {A, St} = erlang:statistics(reductions), 
-                          lists:map(fun(Srv) -> {stats, Srv} ! {load, node(), self(), St} end, ListServers)
+                          lists:map(fun(Srv) -> {pbalancex, Srv} ! {load, node(), self(), St} end, ListServers)
     end,
     loopPstat(ListServers).
 
@@ -44,12 +44,15 @@ getSrvMinAux([{X, L} | XS], {SrvName, Load}) ->
 
 %%self no haria falta
 pbalance(SrvTable) ->
-    register(stats, self()),
+    register(pbalancex, self()),
+    looppbalance(SrvTable).
+
+looppbalance(SrvTable) ->
     receive 
         {load, NameSrv, PidSrv, St} -> NewSrvTable = lists:delete({NameSrv, getSrvLoad(SrvTable, NameSrv)}, SrvTable)++[{NameSrv, St}],
-                                       pbalance(NewSrvTable);
-        {req, Pid} -> Pid ! getSrvMinLoad(SrvTable),
-                      pbalance(SrvTable)
+                                       looppbalance(NewSrvTable);
+        {req, Pid} -> Pid ! {ans, getSrvMinLoad(SrvTable)},
+                      looppbalance(SrvTable)
     end.
 
 
