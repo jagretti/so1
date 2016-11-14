@@ -7,6 +7,7 @@ dispatcher()->
     {ok,ListenSock} = gen_tcp:listen(8000,[{active,false}]),
     connectNodes(['srvA@jose-laptop','srvB@jose-laptop']),
     PidPbalance = spawn(testEst, pbalance, [[{'srvA@jose-laptop',0},{'srvB@jose-laptop',0}]]),
+%%  PidMasterClient = spawn(testEst, masterClient,[[]]),
     loop_dispatcher(ListenSock, PidPbalance).
 
 
@@ -17,7 +18,8 @@ loop_dispatcher(ListenSock, PidPbalance)-> %% Mantiene todos los clientes conect
     Pid!ok,
     loop_dispatcher(ListenSock, PidPbalance).
 
-
+%% Avisar masterClient que hay un nuevo cliente, mandar {add, {nombreCliente, node(), self()}}
+%% Hay que pensar el modo de resolver si falla, y el nombre ya esta usado, habria que esperar una respuesta.
 psocket(Sock, PidPbalance)->
     receive ok -> ok end,
     register(psocketx, self()), %% este nombre deberia ser unico por cada cliente.

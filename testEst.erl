@@ -19,12 +19,35 @@ loopPstat(ListServers) ->
     loopPstat(ListServers).
 
 
+%% ESTRUCTURA MASTER 
+%% LISTA QUE MANTIENE LA FUNCION MASTER [{nombre_cliente, nodo, pid}]
 
+%% CHEQUEAR ESTO QUE NUNCA LO PROBAMOSS!!!!!
 
-%%auxiliar() ->
-%%    net_kernel:connect_node('srvB@jose-laptop'),
-%%    register(stats, self()),
-%%    receive {load, Name, St, Pid} -> Pid ! {<<"recibido">>, St} end.
+%% hacer mas descriptivo el error
+masterClient(ListClients) ->
+    receive {add, {Name, Node, Pid}} -> if clientExists(Name, ListClients) -> Pid ! {mc, errNameAlreadyExists};
+                                        NewListClients = ListClients++[{Name, Node, Pid}],
+                                        Pid ! {mc, addOk},
+                                        masterClient(NewListClients);
+                                        end,
+            {remove, Name} -> del = clientLookUp(Name, ListClients),
+                              if del /= error -> masterClient(lists:delete(del, ListClients))
+    end.
+                              
+                              
+
+clientExists(Name, []) -> false;
+clientExists(Name, [{Na, _, _} | XS]) -> 
+    if Name == Na -> true;
+       Name /= Na -> clientExists(Name, XS)
+    end.
+
+clientLookUp(Name, []) -> error;
+clientLookUp(Name, [{Na, No, P} | XS]) -> 
+    if Name == Na -> {Na, No, P};
+       Name /= Na -> clientLookUp(Name, XS)
+    end.
 
 getSrvLoad([{X, L} | XS], SrvName) ->
     if 
