@@ -25,14 +25,16 @@ loopPstat(ListServers) ->
 %% CHEQUEAR ESTO QUE NUNCA LO PROBAMOSS!!!!!
 
 %% hacer mas descriptivo el error
+%%masterClient([]) -> 
 masterClient(ListClients) ->
-    receive {add, {Name, Node, Pid}} -> if clientExists(Name, ListClients) -> Pid ! {mc, errNameAlreadyExists};
-                                        NewListClients = ListClients++[{Name, Node, Pid}],
-                                        Pid ! {mc, addOk},
-                                        masterClient(NewListClients);
-                                        end,
+    receive {add, {Name, Node, Pid}} -> case (clientExists(Name, ListClients)) of
+                                            true -> Pid ! {mc, errNameAlreadyExists};
+                                            false -> NewListClients = ListClients++[{Name, Node, Pid}],
+                                                     Pid ! {mc, addOk},
+                                                     masterClient(NewListClients)
+                                        end;
             {remove, Name} -> del = clientLookUp(Name, ListClients),
-                              if del /= error -> masterClient(lists:delete(del, ListClients))
+                              if del /= error -> masterClient(lists:delete(del, ListClients)) end
     end.
                               
                               
