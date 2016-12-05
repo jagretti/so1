@@ -1,0 +1,8 @@
+ PRUEBA BASICA
+
+1) Abrir 2 terminales
+2) ejecutar erl -sname srvX (A y B) en cada una
+3) Abrir otra terminal, y hacer erl -sname cliente (o algo asi)
+4) compilar c(server). en un servidor
+5) correr server:dispatcher() 
+6) conectar el cliente compilando c(client). y ejecutando client:client().

@@ -1,15 +1,16 @@
 -module(server).
 -compile(export_all).   
--import(testEst, [pbalance/1, connectNodes/1, masterClient/1]).
+-import(testEst, [pbalance/1, connectNodes/1, masterClient/1, pstat/1]).
 
 %% spawneamos el pbalance en el servidor local, apenas empieza el dispatcher (va a haber uno por nodo)
 dispatcher()->
-    {ok,ListenSock} = gen_tcp:listen(8002,[{active,false}]),
+    {ok,ListenSock} = gen_tcp:listen(8003,[{active,false}]),
     connectNodes(['srvA@jose-laptop','srvB@jose-laptop']),
+    PidPstat = spawn(testEst, pstat, [['srvA@jose-laptop','srvB@jose-laptop']]),
     PidPbalance = spawn(testEst, pbalance, [[{'srvA@jose-laptop',0},{'srvB@jose-laptop',0}]]),
-    io:format("Anteesss \n"),
-    PidMasterClient = spawn(testEst, masterClient,[[]]),
-    io:format("Despues \n"),
+%    io:format("Anteesss \n"),
+    PidMasterClient = spawn(testEst, masterClient,[[],['srvA@jose-laptop','srvB@jose-laptop']]),
+%    io:format("Despues \n"),
     loop_dispatcher(ListenSock, PidPbalance, PidMasterClient).
 
 
