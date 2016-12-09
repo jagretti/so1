@@ -37,7 +37,7 @@ psocket(Sock, PidPbalance, PidMasterClient) ->
                                        io:format("Entro guarda 1 psocket\n"),
                                        receive 
                                            {mc, addOk} -> gen_tcp:send(Socket, ">> Conexion establecida correctamente :) << \n"),
-                                                          looppsocket(Sock, PidPbalance);
+                                                          looppsocket(Sock, PidPbalance, string:substr(string:strip(Msg),5));
                                            {mc, errNameAlreadyExists} -> gen_tcp:send(Socket, "***Error: Nombre ya existe"),
                                                                          self() ! ok,
                                                                          psocket(Sock, PidPbalance, PidMasterClient)
@@ -54,27 +54,27 @@ psocket(Sock, PidPbalance, PidMasterClient) ->
 %%    .
 
 %%ver lo del mensajito de respuesta de pbalance!!
-looppsocket(Sock, PidPbalance) ->
+looppsocket(Sock, PidPbalance, PlayerName) ->
 %%    ok = inet:setopts(Sock,[{active,true}]),
     io:format("entro a looppsocket\n"),
     receive
            {tcp,Socket,Cmd} -> PidPbalance ! {req, self()},
                                io:format("mando peticion a pbalance\n"),
                                receive 
-                                   {ans, Node} -> spawn(Node, server, pcomando, [Cmd, node()])
+                                   {ans, Node} -> spawn(Node, server, pcomando, [Cmd, node(), PlayerName])
                                end;                            
 %%                               spawn(?MODULE, pcomando, [Cmd, self()]);
            {pcomando, Respuesta} -> gen_tcp:send(Sock,Respuesta)
     end,
-    looppsocket(Sock, PidPbalance).
+    looppsocket(Sock, PidPbalance, PlayerName).
 
 
-pcomando(Cmd, Node)->
+pcomando(Cmd, Node, PlayerName)->
     io:format("antes del register pcomando\n"),
     register(pcomandox, self()),
     io:format("despues del register pcomando\n"),
 %%    io:format("paso\n"),
-    looppcomando(Cmd, Node).
+    looppcomando(Cmd, Node, PlayerName).
 
 %% deberia computar el Cmd, y devolverle una respuesta a psocket
 looppcomando(Cmd, Node) ->
