@@ -1,10 +1,10 @@
--module(server).
+-module(serverB).
 -compile(export_all).   
 -import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2]).
 
 %% spawneamos el pbalance en el servidor local, apenas empieza el dispatcher (va a haber uno por nodo)
 dispatcher()->
-    {ok,ListenSock} = gen_tcp:listen(8003,[{active,false}]),
+    {ok,ListenSock} = gen_tcp:listen(8004,[{active,false}]),
     connectNodes(['srvA@jose-laptop','srvB@jose-laptop']),
     PidPstat = spawn(testEst, pstat, [['srvA@jose-laptop','srvB@jose-laptop']]),
     PidPbalance = spawn(testEst, pbalance, [[{'srvA@jose-laptop',0},{'srvB@jose-laptop',0}]]),
@@ -55,7 +55,6 @@ psocket(Sock, PidPbalance, PidMasterClient) ->
 %%    .
 
 %%ver lo del mensajito de respuesta de pbalance!!
-%% PARA QUE PLAYER NAME??
 looppsocket(Sock, PidPbalance, PlayerName) ->
 %%    ok = inet:setopts(Sock,[{active,true}]),
     io:format("entro a looppsocket\n"),
@@ -70,7 +69,7 @@ looppsocket(Sock, PidPbalance, PlayerName) ->
     end,
     looppsocket(Sock, PidPbalance, PlayerName).
 
-% PARA QUE PLAYER NAME??
+
 pcomando(Cmd, Node, PidPSocket, PlayerName)->
     io:format("antes del register pcomando\n"),
 %%    register(pcomandox, self()),
@@ -79,8 +78,7 @@ pcomando(Cmd, Node, PidPSocket, PlayerName)->
     looppcomando(Cmd, Node, PidPSocket, PlayerName).
 
 %% deberia computar el Cmd, y devolverle una respuesta a psocket
-% NO SE POR QUE, PERO FUNCIONA ASI.
-looppcomando(Cmd, Node, PidPSocket, PlayerName) ->
+looppcomando(Cmd, Node, PidPSocket,PlayerName) ->
     PidPSocket ! {pcomando, "Comando recibido"}.
 
 

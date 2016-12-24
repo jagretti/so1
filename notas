@@ -40,7 +40,15 @@ SERVER -> Dispatcher
           Comunicacion entre ellos
           lanzar psocket -> lanza pcomando
 
+-------------------- ULTIMAS ACTUALIZACIONES 24/12 ----------------------
 
+Creo que todo lo relacionado a clientes esta funcionando, los acepta, chequea los nombres,
+y si todo va bien les asigna su psocket. Funciona la comunicacion entre psocket y pcomando,
+no se por que no hizo falta hacer {pidpsocket, nodo} para responderle de pcomando a psocket.
+Falta hacer andar todo lo relacionado a mastergames, y hacer los games posta.
+
+LOS ARCHIVOS IMPORTANTES SON: server, serverB (igual que server pero con otro puerto para probar),
+                              testEst, client.
 
 
 
