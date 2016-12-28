@@ -63,7 +63,13 @@ loopMasterClient(ListClients, ListServers) ->
             {updateDel, {Name, Node}} -> case (Node == node()) of
                                      true -> loopMasterClient(ListClients, ListServers);
                                      false -> loopMasterClient(lists:delete(del, ListClients), ListServers)
-                                 end
+                                 end;
+            {getPlayerName, PidPSocket, PidPComando} -> case (clientNameLookUp(PidPSocket, ListClients)) of
+                                                            error -> PidPComando ! errPidPlayerNotExists,
+                                                                     loopMasterClient(ListClients, ListServers);
+                                                            Name -> PidPComando ! {playerName, Name},
+                                                                    loopMasterClient(ListClients, ListServers)
+                                                        end
     end.
                               
 %% chequear que ande cuando se da de baja un jugador, que se pueda reutilizar el nombre. (esto lo deberia hacer pcomando).
@@ -79,6 +85,21 @@ clientLookUp(Name, [{Na, No, P} | XS]) ->
     if Name == Na -> {Na, No, P};
        Name /= Na -> clientLookUp(Name, XS)
     end.
+
+clientNameLookUp(Pid, []) -> error;
+clientNameLookUp(Pid, [{Na, No, P} | XS]) -> 
+    if Pid == P -> Na;
+       Pid /= P -> clientLookUp(Na, XS)
+    end.
+
+getStateGames([], Libres, Ocupados) -> {Libres, Ocupados};
+getStateGames([{GN, P1, P2, G, LO, LM} | XS], Libres, Ocupados) ->
+    if P2 == "Libre" -> getStateGames(XS, Libres ++ [GN], Ocupados);
+       P2 /= "Libre" -> getStateGames(XS, Libres, Ocupados ++ [GN])
+    end.  
+    
+getP2({GN, P1, P2, LO, LM}) -> P2.
+
 
 %% [{GameName, Player1, Player2, Game, ListObs, LastMove}]
 
@@ -146,7 +167,7 @@ loopMasterGames(ListGames, ListServers) ->
                                          false -> del = gameLookUp(GameName, ListGames),
                                                   loopMasterGames(lists:delete(del, ListGames), ListServers)
                                      end;                                                          
-    {getListGames, PidPComando} -> PidPComando ! {listGames, ListGames};
+    {getListGames, PidPComando} -> PidPComando ! {listGames, ListGames}; 
     {addGame, PidPComando, GameName, P1, Node} -> NewGame = {GameName, P1, "Libre", {0, 0}, [], "NA"},
                                             case (gameExists(GameName, ListGames)) of
                                                 false -> lists:map(fun(Srv) -> {mgx, Srv} ! {updateAdd, {NewGame, Node}} end, ListServers),
@@ -156,21 +177,44 @@ loopMasterGames(ListGames, ListServers) ->
                                                         loopMasterGames(ListGames, ListServers)
                                             end;            
     {removeGame, PidPComando, GameName, Node} -> del = gameLookUp(GameName, ListGames),
-                                           if del /= error -> lists:map(fun(Srv) -> {mgx, Srv} ! {updateDel, {GameName, Node}}end,ListServers),
+                                                 case (del == error) of
+                                                     false -> lists:map(fun(Srv) -> {mgx, Srv} ! {updateDel, {GameName, Node}}end,ListServers),
                                                               PidPComando ! {removeGameOk, GameName},
-                                                              loopMasterGames(lists:delete(del, ListGames), ListServers)
+                                                              loopMasterGames(lists:delete(del, ListGames), ListServers);
+                                                     true -> PidPComando ! {mg, errGameNotExists}
                                            end;                                           
-    {gameChange, PidPComando, GameName, NewPacketGame, Node} -> lists:delete(gameLookUp(GameName, ListGames), ListGames),
-                                                          lists:map(fun(Srv) -> {mgx, Srv} ! {updateGame, {GameName, NewPacketGame, Node}} end, ListServers),
-                                                          loopMasterGames(ListGames++[NewPacketGame], ListServers);
+    {gameChange, PidPComando, GameName, NewPacketGame, Node} -> NewListGames = lists:delete(gameLookUp(GameName, ListGames), ListGames),      
+                                                                lists:map(fun(Srv) -> {mgx, Srv} ! {updateGame, {GameName, NewPacketGame, Node}} end, ListServers),
+                                                                loopMasterGames(NewListGames++[NewPacketGame], ListServers);
     {updateGame, {GameName, NewPacketGame, Node}} -> case (Node == node()) of
                                                          true -> loopMasterGames(ListGames, ListServers);
                                                          false -> PacketGame = gameLookUp(GameName, ListGames),
                                                                   NewListGames = lists:delete(PacketGame, ListGames),
                                                                   loopMasterGames(NewListGames++[NewPacketGame], ListServers)
-                                                     end    
+                                                     end;
+    {addObs, PidPComando, GameName, PlayerName, Node} -> {GN, P1, P2, LO, LM} = gameLookUp(GameName, ListGames),
+                                                         case lists:member(PlayerName, LO) of
+                                                             true -> loopMasterGames(ListGames, ListServers);
+                                                             false -> NewPacketGame = {GN, P1, P2, LO++[PlayerName], LM},
+                                                                      NewListGames = lists:delete({GN, P1, P2, LO, LM}, ListGames),
+                                                                      lists:map(fun(Srv) -> {mgx, Srv} ! {updateGame, {GameName, NewPacketGame, Node}} end, ListServers),
+                                                                      PidPComando ! {addObsOk, GameName},          
+                                                                      loopMasterGames(NewListGames++[NewPacketGame], ListServers)
+                                                         end;
+    {delObs, PidPComando, GameName, PlayerName, Node} -> {GN, P1, P2, LO, LM} = gameLookUp(GameName, ListGames),
+                                                         case lists:member(PlayerName, LO) of
+                                                             true -> NewPacketGame = {GN, P1, P2, lists:delete(PlayerName, LO), LM},
+                                                                     NewListGames = lists:delete({GN, P1, P2, LO, LM}, ListGames),
+                                                                     lists:map(fun(Srv) -> {mgx, Srv} ! {updateGame, {GameName, NewPacketGame, Node}} end, ListServers),
+                                                                     PidPComando ! {removeObsOk, GameName},
+                                                                     loopMasterGames(NewListGames++[NewPacketGame], ListServers);
+                                                             false -> PidPComando ! {mg, errObsNotExists},
+                                                                      loopMasterGames(ListGames, ListServers)
+                                                         end                                    
     end.
 % PROBAR ESTO QUE NO LO PROBAMOS                                                                                                                      
+
+%% Toda los mensajes que comienzan con update son solo mensajes entre servidores, los demas entre pcomandos y servidores.
 
 % HACER!!
 %{updateAddObs
