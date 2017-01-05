@@ -42,6 +42,7 @@ masterClient(ListClients, ListServers) ->
     loopMasterClient(ListClients, ListServers).
 
 loopMasterClient(ListClients, ListServers) ->
+    io:format("Entro a loopMasterClient\n"),
     receive {add, {Name, Node, Pid}} -> case (clientExists(Name, ListClients)) of
                                             true -> Pid ! {mc, errNameAlreadyExists},
                                                     io:format("El nombre ya existe \n"),
@@ -49,6 +50,7 @@ loopMasterClient(ListClients, ListServers) ->
                                             false -> NewListClients = ListClients++[{Name, Node, Pid}],
                                                      Pid ! {mc, addOk},
                                                      lists:map(fun(Srv) -> {mcx, Srv} ! {updateAdd, {Name, Node, Pid}} end, ListServers),
+                                                     io:format("llegue hasta aca\n"),
                                                      loopMasterClient(NewListClients, ListServers)
                                         end;
             {remove, {Name, Node}} -> del = clientLookUp(Name, ListClients),
@@ -64,10 +66,15 @@ loopMasterClient(ListClients, ListServers) ->
                                      true -> loopMasterClient(ListClients, ListServers);
                                      false -> loopMasterClient(lists:delete(del, ListClients), ListServers)
                                  end;
-            {getPlayerName, PidPSocket, PidPComando} -> case (clientNameLookUp(PidPSocket, ListClients)) of
-                                                            error -> PidPComando ! errPidPlayerNotExists,
+            {getPlayerName, PidPSocket, PidPComando} -> io:format("Entro en getPlayerName\n"),
+                                                        case (clientNameLookUp(PidPSocket, ListClients)) of
+                                                            error -> io:format("Antes de mandar a pcomando error\n"),
+                                                                     PidPComando ! errPidPlayerNotExists,
+                                                                     io:format("Mando error a pcomando\n"),
                                                                      loopMasterClient(ListClients, ListServers);
-                                                            Name -> PidPComando ! {playerName, Name},
+                                                            Name -> io:format("Antes de mandar a pcomando Ok\n"),
+                                                                    PidPComando ! {playerName, Name},
+                                                                    io:format("Manda el nombre a pcomando\n"),
                                                                     loopMasterClient(ListClients, ListServers)
                                                         end
     end.
@@ -89,7 +96,7 @@ clientLookUp(Name, [{Na, No, P} | XS]) ->
 clientNameLookUp(Pid, []) -> error;
 clientNameLookUp(Pid, [{Na, No, P} | XS]) -> 
     if Pid == P -> Na;
-       Pid /= P -> clientLookUp(Na, XS)
+       Pid /= P -> clientNameLookUp(Pid, XS)
     end.
 
 getStateGames([], Libres, Ocupados) -> {Libres, Ocupados};
@@ -156,6 +163,7 @@ masterGames(ListGames, ListServers) ->
 %% La parte de mensajes mg la deberian implementar los pcomando! 
 %%  EN LINEAS 150, 157, 162 la variable Node esta siendo usada sin que exista, ver como hacer (la agrego a donde llegan los msjs)
 loopMasterGames(ListGames, ListServers) ->
+    io:format("Entro a loopMasterGames\n"),
     receive 
     {updateAdd, {PacketGame, Node}} -> case (Node == node()) of
                                            true -> loopMasterGames(ListGames, ListServers);
@@ -181,7 +189,8 @@ loopMasterGames(ListGames, ListServers) ->
                                                      false -> lists:map(fun(Srv) -> {mgx, Srv} ! {updateDel, {GameName, Node}}end,ListServers),
                                                               PidPComando ! {removeGameOk, GameName},
                                                               loopMasterGames(lists:delete(del, ListGames), ListServers);
-                                                     true -> PidPComando ! {mg, errGameNotExists}
+                                                     true -> PidPComando ! {mg, errGameNotExists},
+                                                             loopMasterGames(ListGames, ListServers)
                                            end;                                           
     {gameChange, PidPComando, GameName, NewPacketGame, Node} -> NewListGames = lists:delete(gameLookUp(GameName, ListGames), ListGames),      
                                                                 lists:map(fun(Srv) -> {mgx, Srv} ! {updateGame, {GameName, NewPacketGame, Node}} end, ListServers),

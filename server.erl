@@ -1,6 +1,6 @@
 -module(server).
 -compile(export_all).   
--import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2]).
+-import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2, gameExists/2]).
 
 %% spawneamos el pbalance en el servidor local, apenas empieza el dispatcher (va a haber uno por nodo)
 dispatcher()->
@@ -63,7 +63,8 @@ looppsocket(Sock, PidPbalance, PidMasterClient, PidMasterGames) ->
            {tcp,Socket,Cmd} -> PidPbalance ! {req, self()},
                                io:format("mando peticion a pbalance\n"),
                                receive 
-                                   {ans, Node} -> spawn(Node, server, pcomando, [Cmd, node(), self(), PidMasterClient, PidMasterGames])
+                                   {ans, Node} -> io:format(Node),
+                                                  spawn(Node, server, pcomando, [Cmd, node(), self(), PidMasterClient, PidMasterGames])
                                end;                            
            {pcomando, ok, Cmd, Msg} -> io:format("Se recibio el mensaje\n"),
                                        gen_tcp:send(Sock, Msg);
@@ -84,7 +85,7 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
          % NEW GameName 
          "NEW" -> GameName = lists:nth(2, Tokens),
                   {mcx, node()} ! {getPlayerName, PidPSocket, self()},
-                  io:format("mande mensaje a masterclient\n"), %% ACA LA PRIMERA VEZ ANDA, LA SEGUNDA NO -_-
+                  io:format("mande mensaje a masterclient\n"),
                   receive {playerName, Name} -> io:format("Antes de mandar addGame\n"),
                                                 {mgx, node()} ! {addGame, self(), GameName, Name, node()},
                                                 io:format("Antes del receive de mgx\n"),
@@ -97,19 +98,24 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
           %% ACC GameName
          "ACC" -> GameName = lists:nth(2, Tokens),
                   PidMasterGames ! {getListGames, self()},
-                  receive {listGames, ListGames} -> {Libres, Ocupados} = getStateGames(ListGames, [], []) end,
-                  case (lists:member(GameName, Libres)) of
-                      true -> {GN, P1, P2, G,LO, LM} = gameLookUp(GameName, ListGames),
-                              {mcx, node()} ! {getPlayerName, PidPSocket, self()},
-                              receive {playerName, PlayerName} -> case (P1 == PlayerName) of
-                                                                      true -> PidPSocket ! {pcomando, error, Cmd, "Accion invalida"};
-                                                                      false -> NewPacketGame = {GN, P1, PlayerName, G ,LO, LM},
-                                                                               {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
-                                                                               PidPSocket ! {pcomando, ok, Cmd, "Juego aceptado"}
-                                                                  end
-                              end; 
-                      false -> PidPSocket ! {pcomando, error, Cmd, "Juego ocupado"}
-                  end
+                  receive {listGames, ListGames} -> 
+                      case gameExists(GameName, ListGames) of % ACA FALLA NO DEVUELVE EL ERROR CUANDO SE HACE UN ACC de inexistente
+                          false -> PidPSocket ! {pcomando, error, Cmd, "Juego inexistente"};
+                          true -> {Libres, Ocupados} = getStateGames(ListGames, [], []),
+                                  case (lists:member(GameName, Libres)) of
+                                      true -> {GN, P1, P2, G,LO, LM} = gameLookUp(GameName, ListGames),
+                                              {mcx, node()} ! {getPlayerName, PidPSocket, self()},
+                                              receive {playerName, PlayerName} -> case (P1 == PlayerName) of
+                                                                                      true -> PidPSocket ! {pcomando, error, Cmd, "Accion invalida"};
+                                                                                      false -> NewPacketGame = {GN, P1, PlayerName, G ,LO, LM},
+                                                                                               {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
+                                                                                               PidPSocket ! {pcomando, ok, Cmd, "Juego aceptado"}
+                                                                                  end
+                                              end; 
+                                      false -> PidPSocket ! {pcomando, error, Cmd, "Juego ocupado"}
+                                  end
+                      end
+                  end  
     end.                            
 %         "PLA" ->
 %         "OBS" ->
