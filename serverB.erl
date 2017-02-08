@@ -150,7 +150,7 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                                       {playerName, Name} -> case obsExists(Name, GameName, ListGames) of
                                                                 false -> PidPSocket ! {pcomando, error, Cmd, "Partida no observada"};
                                                                 true -> PidMasterGames ! {delObs, self(), GameName, Name, node()},
-                                                                        receive {deleteObsOk, GN} -> PidPSocket ! {pcomando, ok, Cmd, "Observacion terminada"}
+                                                                        receive {removeObsOk, GN} -> PidPSocket ! {pcomando, ok, Cmd, "Observacion terminada"}
                                                                         end      
                                                             end
                                   end
