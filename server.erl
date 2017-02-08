@@ -1,6 +1,6 @@
 -module(server).
 -compile(export_all).   
--import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2, gameExists/2]).
+-import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2, gameExists/2, listToString/1, obsExists/3]).
 
 %% spawneamos el pbalance en el servidor local, apenas empieza el dispatcher (va a haber uno por nodo)
 dispatcher()->
@@ -80,7 +80,7 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
          % LSG 
          "LSG" -> PidMasterGames ! {getListGames, self()},
                   receive {listGames, Respuesta} -> {Libres, Ocupados} = getStateGames(Respuesta, [], []),
-                                                    PidPSocket ! {pcomando, ok, Cmd, {Libres, Ocupados}}
+                                                    PidPSocket ! {pcomando, ok, Cmd, ["Libres: ", listToString(Libres), " - Ocupados: ", listToString(Ocupados)]} % {Libres, Ocupados}
                   end;
          % NEW GameName 
          "NEW" -> GameName = lists:nth(2, Tokens),
@@ -97,9 +97,12 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                   end;
           %% ACC GameName
          "ACC" -> GameName = lists:nth(2, Tokens),
+%                  io:format("Antes de mandar el mensaje a MG\n"),
                   PidMasterGames ! {getListGames, self()},
-                  receive {listGames, ListGames} -> 
-                      case gameExists(GameName, ListGames) of % ACA FALLA NO DEVUELVE EL ERROR CUANDO SE HACE UN ACC de inexistente
+%                  io:format("Despues de mandar el mensaje a MG\n"),
+                  receive {listGames, ListGames} ->
+%                      io:format("Respondio MG\n"), 
+                      case gameExists(GameName, ListGames) of 
                           false -> PidPSocket ! {pcomando, error, Cmd, "Juego inexistente"};
                           true -> {Libres, Ocupados} = getStateGames(ListGames, [], []),
                                   case (lists:member(GameName, Libres)) of
@@ -115,10 +118,47 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                                       false -> PidPSocket ! {pcomando, error, Cmd, "Juego ocupado"}
                                   end
                       end
-                  end  
+                  end;
+         %% OBS GameName {addObs, PidPComando, GameName, PlayerName, Node} {getPlayerName, PidPSocket, PidPComando}
+         "OBS" -> GameName = lists:nth(2, Tokens),
+                  PidMasterGames ! {getListGames, self()},
+%                  io:format("Despues de mandar el mensaje a MG\n"),
+                  receive {listGames, ListGames} ->
+%                      io:format("Respondio MG\n"), 
+                      case gameExists(GameName, ListGames) of 
+                          false -> PidPSocket ! {pcomando, error, Cmd, "Juego inexistente"};
+                          true -> PidMasterClient ! {getPlayerName, PidPSocket, self()},
+                                  receive 
+                                      errPidPlayerNotExists -> PidPSocket ! {pcomando, error, Cmd, "Jugador no registrado"};
+                                      {playerName, Name} -> case obsExists(Name, GameName, ListGames) of
+                                                                true -> PidPSocket ! {pcomando, error, Cmd, "Ya esta observando"};
+                                                                false -> PidMasterGames ! {addObs, self(), GameName, Name, node()},
+                                                                         receive {addObsOk, GN} -> PidPSocket ! {pcomando, ok, Cmd, "Observacion iniciada"}
+                                                                         end
+                                                            end
+                                  end
+                      end
+                  end;
+         "LEA" -> GameName = lists:nth(2, Tokens),
+                  PidMasterGames ! {getListGames, self()},
+                  receive {listGames, ListGames} ->
+                      case gameExists(GameName, ListGames) of 
+                          false -> PidPSocket ! {pcomando, error, Cmd, "Juego inexistente"};
+                          true -> PidMasterClient ! {getPlayerName, PidPSocket, self()},
+                                  receive 
+                                      errPidPlayerNotExists -> PidPSocket ! {pcomando, error, Cmd, "Jugador no registrado"};
+                                      {playerName, Name} -> case obsExists(Name, GameName, ListGames) of
+                                                                false -> PidPSocket ! {pcomando, error, Cmd, "Partida no observada"};
+                                                                true -> PidMasterGames ! {delObs, self(), GameName, Name, node()},
+                                                                        receive {removeObsOk, GN} -> PidPSocket ! {pcomando, ok, Cmd, "Observacion terminada"}
+                                                                        end      
+                                                            end
+                                  end
+                      end
+                  end                                          
+                                      
     end.                            
 %         "PLA" ->
-%         "OBS" ->
 %         "LEA" ->
          %% Si se va P2, pasar a que sea P1
 %         "BYE" ->
