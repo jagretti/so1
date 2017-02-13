@@ -1,6 +1,7 @@
 -module(serverB).
 -compile(export_all).   
 -import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2, gameExists/2, listToString/1, obsExists/3]).
+-import(gameLogic, [makeMatrix/1]).
 
 %% spawneamos el pbalance en el servidor local, apenas empieza el dispatcher (va a haber uno por nodo)
 dispatcher()->
@@ -80,7 +81,7 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
          % LSG 
          "LSG" -> PidMasterGames ! {getListGames, self()},
                   receive {listGames, Respuesta} -> {Libres, Ocupados} = getStateGames(Respuesta, [], []),
-                                                    PidPSocket ! {pcomando, ok, Cmd, ["Libres: ", listToString(Libres), " - Ocupados: ", listToString(Ocupados)]} % {Libres, Ocupados}
+                                                    PidPSocket ! {pcomando, ok, Cmd, ["Libres: ", listToString(Libres), " - Ocupados: ", listToString(Ocupados)]}
                   end;
          % NEW GameName 
          "NEW" -> GameName = lists:nth(2, Tokens),
@@ -112,12 +113,14 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                                                                                       true -> PidPSocket ! {pcomando, error, Cmd, "Accion invalida"};
                                                                                       false -> NewPacketGame = {GN, P1, PlayerName, G ,LO, LM},
                                                                                                {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
-                                                                                               PidPSocket ! {pcomando, ok, Cmd, "Juego aceptado"}
+                                                                                               PidPSocket ! {pcomando, ok, Cmd, "Juego aceptado"},
+                                                                                               timer:sleep(500),
+                                                                                               {mgx, node()} ! {sendUpdatesUPD, GameName, PidMasterClient}
                                                                                   end
                                               end; 
                                       false -> PidPSocket ! {pcomando, error, Cmd, "Juego ocupado"}
                                   end
-                      end
+                      end %% ENVIAR TABLERO A AMBOS JUGADORES, Y A LOS OBSERVADORES
                   end;
          %% OBS GameName {addObs, PidPComando, GameName, PlayerName, Node} {getPlayerName, PidPSocket, PidPComando}
          "OBS" -> GameName = lists:nth(2, Tokens),
@@ -155,11 +158,20 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                                                             end
                                   end
                       end
-                  end                                          
-                                      
+                  end;
+         % PLA juegoid jugada
+%%         "PLA" ->                                          
+         "UPD" -> GameName = lists:nth(2, Tokens),
+                  PidMasterGames ! {getListGames, self()},
+                  receive {listGames, ListGames} ->
+                      case gameExists(GameName, ListGames) of 
+                          false -> PidPSocket ! {pcomando, error, Cmd, "Juego inexistente"};
+                          true -> {GN, P1, P2, G, LO, LM} = gameLookUp(GameName, ListGames),
+                                  PidPSocket ! {pcomando, ok, Cmd, listToString(makeMatrix(G))}
+                      end
+                  end                          
     end.                            
-%         "PLA" ->
-%         "LEA" ->
+%         "PLA" -> %% ENVIAR TABLERO A AMBOS JUGADORES, Y A LOS OBSERVADORES
          %% Si se va P2, pasar a que sea P1
 %         "BYE" ->
 %         "UPD" ->

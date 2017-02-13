@@ -81,7 +81,13 @@ loopMasterClient(ListClients, ListServers) ->
                                                                     PidPComando ! {playerName, Name},
                                                                     io:format("Manda el nombre a pcomando\n"),
                                                                     loopMasterClient(ListClients, ListServers)
-                                                        end
+                                                        end;
+            {getPidsPSockets, P1, P2, LO, PidAns} -> {Na1, No1, Pid1} = clientLookUp(P1, ListClients),
+                                                     {Na2, No2, Pid2} = clientLookUp(P2, ListClients),
+                                                     PidObservers = lists:map(fun(X) -> clientLookUp(X, ListClients) end, LO), 
+                                                     PidObservers1 = lists:map(fun({N, No, P}) -> {No, P} end, PidObservers),
+                                                     PidAns ! {playerPids, [{No1, Pid1}] ++ [{No2, Pid2}] ++ PidObservers1},
+                                                     loopMasterClient(ListClients, ListServers) 
     end.
                               
 %% chequear que ande cuando se da de baja un jugador, que se pueda reutilizar el nombre. (esto lo deberia hacer pcomando).
@@ -227,9 +233,17 @@ loopMasterGames(ListGames, ListServers) ->
                                                          NewListGames = lists:delete({GN, P1, P2, Game, LO, LM}, ListGames),
                                                          lists:map(fun(Srv) -> {mgx, Srv} ! {updateGame, {GameName, NewPacketGame, Node}} end, ListServers),
                                                          PidPComando ! {removeObsOk, GameName},
-                                                         loopMasterGames(NewListGames++[NewPacketGame], ListServers)
-                                    
+                                                         loopMasterGames(NewListGames++[NewPacketGame], ListServers);
+    {sendUpdatesUPD, GameName, PidMasterClient} -> {GN, P1, P2, Game, LO, LM} = gameLookUp(GameName, ListGames),
+                                                   {mcx, node()} ! {getPidsPSockets, P1, P2, LO, self()},
+                                                   receive 
+                                                       {playerPids, ListPlayers} -> lists:map(fun({No, Pid}) -> spawn(No, server, pcomando, ["UPD "++GameName, No, Pid, PidMasterClient, self()]) end, ListPlayers)
+                                                   end,
+                                                   loopMasterGames(ListGames, ListServers)
     end.
+
+
+
 
 % PROBAR ESTO QUE NO LO PROBAMOS                                                                                                                      
 
