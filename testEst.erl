@@ -33,7 +33,9 @@ listToString([]) -> "";
 listToString([X]) -> X;
 listToString([X | XS]) -> string:concat(string:concat(X, ", "), listToString(XS)).
 
-
+listToRow([]) -> "";
+listToRow([X]) -> X;
+listToRow([X | XS]) -> string:concat(string:concat(X, " "), listToRow(XS)).
 
 %% ESTRUCTURA MASTER 
 %% LISTA QUE MANTIENE LA FUNCION MASTER [{nombre_cliente, nodo, pid}]

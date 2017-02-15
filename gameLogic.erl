@@ -1,14 +1,20 @@
 -module(gameLogic).
 -compile(export_all).
 
-move(M, T1, T2) -> Move = trunc(math:pow(2,M-1)),
-                   case validMove(Move, T1, T2) of
-                       true -> {Move+T1, T2};
-                       false -> error
-                   end.
+move(M, {T1, T2}, Player) -> case ((M > 0) and (M < 10)) of
+                                 true -> Move = trunc(math:pow(2,M-1)),
+                                         case validMove(Move, T1, T2) of
+                                             true -> case Player of
+                                                         1 -> {Move+T1, T2};            
+                                                         2 -> {T1, Move+T2}                                                     
+                                                     end;
+                                             false -> error
+                                         end;
+                                 false -> error
+                             end.
 
 
-validMove(Move, T1, T2) -> (((Move band T2) == 0) and ((Move band T1) == 0)) and ((Move < 10) and (Move > 0)).
+validMove(Move, T1, T2) -> (((Move band T2) == 0) and ((Move band T1) == 0)).
 
 %% Asumimos que siempre el movimiento se corresponde al tablero 1 (hacer esto bien en el pcomando)
 
