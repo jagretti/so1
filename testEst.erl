@@ -207,11 +207,11 @@ loopMasterGames(ListGames, ListServers) ->
                                                 true -> PidPComando ! {mg, errNameAlreadyExists},
                                                         loopMasterGames(ListGames, ListServers)
                                             end;            
-    {removeGame, PidPComando, GameName, Node} -> del = gameLookUp(GameName, ListGames),
-                                                 case (del == error) of
+    {removeGame, PidPComando, GameName, Node} -> Del = gameLookUp(GameName, ListGames),
+                                                 case (Del == error) of
                                                      false -> lists:map(fun(Srv) -> {mgx, Srv} ! {updateDel, {GameName, Node}}end,ListServers),
                                                               PidPComando ! {removeGameOk, GameName},
-                                                              loopMasterGames(lists:delete(del, ListGames), ListServers);
+                                                              loopMasterGames(lists:delete(Del, ListGames), ListServers);
                                                      true -> PidPComando ! {mg, errGameNotExists},
                                                              loopMasterGames(ListGames, ListServers)
                                            end;                                           

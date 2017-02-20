@@ -1,6 +1,7 @@
 -module(gameLogic).
 -compile(export_all).
 
+% M representa la posicion en el tablero
 move(M, {T1, T2}, Player) -> case ((M > 0) and (M < 10)) of
                                  true -> Move = trunc(math:pow(2,M-1)),
                                          case validMove(Move, T1, T2) of
