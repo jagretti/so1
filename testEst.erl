@@ -60,9 +60,9 @@ loopMasterClient(ListClients, ListServers) ->
                                                      io:format("llegue hasta aca\n"),
                                                      loopMasterClient(NewListClients, ListServers)
                                         end;
-            {remove, {Name, Node}} -> del = clientLookUp(Name, ListClients),
-                                      if del /= error -> lists:map(fun(Srv) -> {mcx, Srv} ! {updateDel, {Name, Node}} end,ListServers),
-                                                         loopMasterClient(lists:delete(del, ListClients), ListServers)
+            {remove, {Name, Node}} -> Del = clientLookUp(Name, ListClients),
+                                      if Del /= error -> lists:map(fun(Srv) -> {mcx, Srv} ! {updateDel, {Name, Node}} end,ListServers),
+                                                         loopMasterClient(lists:delete(Del, ListClients), ListServers)
                               end;
             {updateAdd, {Name, Node, Pid}} -> case (Node == node()) of
                                                   true -> loopMasterClient(ListClients, ListServers);
@@ -71,8 +71,9 @@ loopMasterClient(ListClients, ListServers) ->
                                               end;
             {updateDel, {Name, Node}} -> case (Node == node()) of
                                      true -> loopMasterClient(ListClients, ListServers);
-                                     false -> loopMasterClient(lists:delete(del, ListClients), ListServers)
-                                 end;
+                                     false -> Del = clientLookUp(Name, ListClients),
+                                              loopMasterClient(lists:delete(Del, ListClients), ListServers)
+                                         end;
             {getPlayerName, PidPSocket, PidPComando} -> io:format("Entro en getPlayerName\n"),
                                                         case (clientNameLookUp(PidPSocket, ListClients)) of
                                                             error -> io:format("Antes de mandar a pcomando error\n"),
@@ -137,6 +138,20 @@ gameLookUp(GameName, [{GN, P1, P2, G, LO, LM} | XS]) ->
         false -> gameLookUp(GameName, XS)
     end.
 
+getPlayerGames(PlayerName, []) -> error;
+getPlayerGames(PlayerName, [{GN, P1, P2, G, LO, LM} | XS]) ->
+    case ((PlayerName == P1) or (PlayerName == P2)) of
+        true -> [GN]++getPlayerGames(PlayerName, XS);
+        false -> getPlayerGames(PlayerName, XS)
+    end.
+
+getPlayerObsGames(PlayerName, []) -> error;
+getPlayerObsGames(PlayerName, [{GN, P1, P2, G, LO, LM} | XS]) ->
+    case lists:member(PlayerName, LO) of
+        true -> [GN]++getPlayerObsGames(PlayerName, XS);
+        false -> getPlayerObsGames(PlayerName, XS)
+    end.
+
 getSrvLoad([{X, L} | XS], SrvName) ->
     if 
         X == SrvName -> L;
@@ -194,8 +209,8 @@ loopMasterGames(ListGames, ListServers) ->
                                        end;
     {updateDel, {GameName, Node}} -> case (Node == node()) of
                                          true -> loopMasterGames(ListGames, ListServers);
-                                         false -> del = gameLookUp(GameName, ListGames),
-                                                  loopMasterGames(lists:delete(del, ListGames), ListServers)
+                                         false -> Del = gameLookUp(GameName, ListGames),
+                                                  loopMasterGames(lists:delete(Del, ListGames), ListServers)
                                      end;                                                          
     {getListGames, PidPComando} -> PidPComando ! {listGames, ListGames},
                                    loopMasterGames(ListGames, ListServers); 

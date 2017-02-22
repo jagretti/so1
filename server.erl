@@ -1,6 +1,6 @@
 -module(server).
 -compile(export_all).   
--import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2, gameExists/2, listToString/1, obsExists/3, listToRow/1]).
+-import(testEst, [pbalance/1, connectNodes/1, masterClient/2, pstat/1, masterGames/2, getStateGames/3, getP2/1, gameLookUp/2, gameExists/2, listToString/1, obsExists/3, listToRow/1, getPlayerGames/2, getPlayerObsGames/2]).
 -import(gameLogic, [makeMatrix/1, move/3, validMove/3, winGame/1]).
 
 %% spawneamos el pbalance en el servidor local, apenas empieza el dispatcher (va a haber uno por nodo)
@@ -170,25 +170,33 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                                   PidMasterClient ! {getPlayerName, PidPSocket, self()},
                                   receive 
                                       errPidPlayerNotExists -> PidPSocket ! {pcomando, error, Cmd, "Operacion invalida"};
-                                      {playerName, Name} -> case (Name == LM) of
-                                                  true -> PidPSocket ! {pcomando, error, Cmd, "Aguarde su turno"};
-                                                  false -> case (Name == P1) of
-                                                               true -> case move(list_to_integer(Jugada), G, 1) of
-                                                                           error -> PidPSocket ! {pcomando, error, Cmd, "Jugada invalida"};
-                                                                           {T1, T2} -> NewPacketGame = {GN, P1, P2, {T1, T2}, LO, Name},
-                                                                                       {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
-                                                                                       timer:sleep(500),
-                                                                                      % PidPSocket ! {pcomando, ok, Cmd, "ESTADOPLA1: "++integer_to_list(length(Name))++" "++integer_to_list(length(P1))},
-                                                                                       {mgx, node()} ! {sendUpdatesUPD, GameName, PidMasterClient}
-                                                                       end;
-                                                               false -> case move(list_to_integer(Jugada), G, 2) of
-                                                                           error -> PidPSocket ! {pcomando, error, Cmd, "Jugada invalida"};
-                                                                           {T1, T2} -> NewPacketGame = {GN, P1, P2, {T1, T2}, LO, Name},
-                                                                                       {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
-                                                                                       timer:sleep(500),
-                                                                                      % PidPSocket ! {pcomando, ok, Cmd, "ESTADOPLA1: "++lists:flatten(io_lib:format("~p",[Name]))++"||"++lists:flatten(io_lib:format("~p",[P1]))},
-                                                                                       {mgx, node()} ! {sendUpdatesUPD, GameName, PidMasterClient}
-                                                                        end
+                                      {playerName, Name} -> case Name == LM of
+                                                  true when (Jugada /= "0") -> PidPSocket ! {pcomando, error, Cmd, "Aguarde su turno"};
+                                                  _ -> case list_to_integer(Jugada) of
+                                                               0  -> case (Name == P1) of
+                                                                          true -> NewPacketGame = {GN, P1, P2, G, LO, "-1"};
+                                                                          false -> NewPacketGame = {GN, P1, P2, G, LO, "-2"}
+                                                                     end,
+                                                                     {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
+                                                                     timer:sleep(500),
+                                                                     {mgx, node()} ! {sendUpdatesUPD, GameName, PidMasterClient};
+
+                                                               N when (Name == P1) -> case move(N, G, 1) of
+                                                                                          error -> PidPSocket ! {pcomando, error, Cmd, "Jugada invalida"};
+                                                                                          {T1, T2} -> NewPacketGame = {GN, P1, P2, {T1, T2}, LO, Name},
+                                                                                                      {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
+                                                                                                      timer:sleep(500),
+                                                                                                     % PidPSocket ! {pcomando, ok, Cmd, "ESTADOPLA1: "++integer_to_list(length(Name))++" "++integer_to_list(length(P1))},
+                                                                                                      {mgx, node()} ! {sendUpdatesUPD, GameName, PidMasterClient}
+                                                                                      end;
+                                                               N when (Name == P2) -> case move(N, G, 2) of
+                                                                                          error -> PidPSocket ! {pcomando, error, Cmd, "Jugada invalida"};
+                                                                                          {T1, T2} -> NewPacketGame = {GN, P1, P2, {T1, T2}, LO, Name},
+                                                                                                      {mgx, node()} ! {gameChange, self(), GameName, NewPacketGame, node()},
+                                                                                                      timer:sleep(500),
+                                                                                                     % PidPSocket ! {pcomando, ok, Cmd, "ESTADOPLA1: "++lists:flatten(io_lib:format("~p",[Name]))++"||"++lists:flatten(io_lib:format("~p",[P1]))},
+                                                                                                      {mgx, node()} ! {sendUpdatesUPD, GameName, PidMasterClient}
+                                                                                       end
                                                            end
                                               end
                                   end
@@ -205,25 +213,43 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                                   timer:sleep(500),
                                   PidPSocket ! {pcomando, ok, Cmd, listToRow(makeMatrix({T1, T2}))},
 %                                  PidPSocket ! {pcomando, ok, Cmd, "ESTADOUPD: "++integer_to_list(T1)++" "++integer_to_list(T2)},
-                                  case (LM == P1) of
-                                      true -> case winGame(T1) of
-                                                  false -> false;
-                                                  true -> PidPSocket ! {pcomando, ok, Cmd, "**** Partida terminada - "++P1++" ha ganado"},
-                                                          timer:sleep(500),
-                                                          PidMasterGames ! {removeGame, self(), GameName, node()}
-                                              end;
-                                      false -> case winGame(T2) of
-                                                  false -> false;
-                                                  true -> PidPSocket ! {pcomando, ok, Cmd, "**** Partida terminada - "++P2++" ha ganado"},
-                                                          timer:sleep(500),
-                                                          PidMasterGames ! {removeGame, self(), GameName, node()}
-                                               end
+                                  case LM of
+                                      "-1" -> PidPSocket ! {pcomando, ok, Cmd, "**** Partida terminada - "++P1++" ha abandonado - "++P2++" ha ganado"},
+                                              timer:sleep(500),
+                                              PidMasterGames ! {removeGame, self(), GameName, node()};
+                                      "-2" -> PidPSocket ! {pcomando, ok, Cmd, "**** Partida terminada - "++P2++" ha abandonado - "++P1++" ha ganado"},
+                                              timer:sleep(500),
+                                              PidMasterGames ! {removeGame, self(), GameName, node()};
+                                      P1 -> case winGame(T1) of
+                                                false -> false;
+                                                true -> PidPSocket ! {pcomando, ok, Cmd, "**** Partida terminada - "++P1++" ha ganado"},
+                                                        timer:sleep(500),
+                                                        PidMasterGames ! {removeGame, self(), GameName, node()}
+                                            end;
+                                      P2 -> case winGame(T2) of
+                                                false -> false;
+                                                true -> PidPSocket ! {pcomando, ok, Cmd, "**** Partida terminada - "++P2++" ha ganado"},
+                                                        timer:sleep(500),
+                                                        PidMasterGames ! {removeGame, self(), GameName, node()}
+                                            end
                                   end
 %                                  PidPSocket ! {pcomando, ok, Cmd, string:sub_string(listToRow(makeMatrix(G)), 1, 5)},
 %                                  PidPSocket ! {pcomando, ok, Cmd, string:sub_string(listToRow(makeMatrix(G)), 7, 11)},
 %                                  PidPSocket ! {pcomando, ok, Cmd, string:sub_string(listToRow(makeMatrix(G)), 13, 17)}  
                       end
-                  end                          
+                  end;    
+         "BYE" -> PidMasterClient ! {getPlayerName, PidPSocket, self()},
+                  receive 
+                      errPidPlayerNotExists -> PidPSocket ! {pcomando, error, Cmd, "Operacion invalida"};
+                      {playerName, Name} -> PidMasterGames ! {getListGames, self()},
+                                            receive {listGames, ListGames} -> PlayedGames = getPlayerGames(Name, ListGames),
+                                                                              ObsGames = getPlayerObsGames(Name, ListGames),
+                                                                              lists:map(fun(X) -> spawn(node(), server, pcomando, ["PLA "++X++" 0", node(), PidPSocket, PidMasterClient, PidMasterGames]) end, PlayedGames),
+                                                                              lists:map(fun(X) -> PidMasterGames ! {delObs, self(), X, Name, node()} end, ObsGames),
+                                                                              PidMasterClient ! {remove, {Name, node()}},
+                                                                              PidPSocket ! {pcomando, ok, Cmd, "Vuelva pronto :)"}
+                                            end
+                  end                   
     end.                            
 %         "PLA" -> %% ENVIAR TABLERO A AMBOS JUGADORES, Y A LOS OBSERVADORES
          %% Si se va P2, pasar a que sea P1
