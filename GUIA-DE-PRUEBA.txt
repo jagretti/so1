@@ -1,0 +1,22 @@
+Servidores:
+
+-> A:
+erl -sname srvA
+c(server)
+server:dispatcher().
+
+-> B:
+erl -sname srvB
+c(serverB)
+serverB:dispatcher().
+
+-> Cliente 1
+erl -sname c1
+{ok,Sock} = gen_tcp:connect("localhost", 8003, [binary, {packet,0}]).
+gen_tcp:send(Sock,"CON hernan").
+
+-> Cliente 2
+erl -sname c1
+{ok,Sock} = gen_tcp:connect("localhost", 8004, [binary, {packet,0}]).
+gen_tcp:send(Sock,"CON omar").
+

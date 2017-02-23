@@ -242,10 +242,12 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
                   receive 
                       errPidPlayerNotExists -> PidPSocket ! {pcomando, error, Cmd, "Operacion invalida"};
                       {playerName, Name} -> PidMasterGames ! {getListGames, self()},
-                                            receive {listGames, ListGames} -> PlayedGames = getPlayerGames(Name, ListGames),
-                                                                              ObsGames = getPlayerObsGames(Name, ListGames),
-                                                                              lists:map(fun(X) -> spawn(node(), server, pcomando, ["PLA "++X++" 0", node(), PidPSocket, PidMasterClient, PidMasterGames]) end, PlayedGames),
-                                                                              lists:map(fun(X) -> PidMasterGames ! {delObs, self(), X, Name, node()} end, ObsGames),
+                                            receive {listGames, ListGames} -> %PlayedGames = getPlayerGames(Name, ListGames),
+                                                                              %ObsGames = getPlayerObsGames(Name, ListGames),
+%                                                                              lists:map(fun(X) -> spawn(node(), ?MODULE, pcomando, ["PLA "++X++" 0", node(), PidPSocket, PidMasterClient, PidMasterGames]) end, PlayedGames),
+%                                                                              lists:map(fun(X) -> spawn(node(), ?MODULE, pcomando, ["LSG", node(), PidPSocket, PidMasterClient, PidMasterGames]) end, PlayedGames),
+                                                                              PidMasterGames ! {msgBye, Name, node(), PidPSocket, PidMasterClient},
+%                                                                              lists:map(fun(X) -> PidMasterGames ! {delObs, self(), X, Name, node()} end, ObsGames),
                                                                               PidMasterClient ! {remove, {Name, node()}},
                                                                               PidPSocket ! {pcomando, ok, Cmd, "Vuelva pronto :)"}
                                             end
@@ -253,7 +255,7 @@ pcomando(Cmd, Node, PidPSocket, PidMasterClient, PidMasterGames)->
     end.                            
 %         "PLA" -> %% ENVIAR TABLERO A AMBOS JUGADORES, Y A LOS OBSERVADORES
          %% Si se va P2, pasar a que sea P1
-%         "BYE" ->
+%         "BYE" -> spawn(Node, server, pcomando, [Cmd, node(), self(), PidMasterClient, PidMasterGames])
 
 %% deberia computar el Cmd, y devolverle una respuesta a psocket
 % NO SE POR QUE, PERO FUNCIONA ASI, PREGUNTAR A GUILLERMO. POR QUE NO ANDA SI AGREGAMOS EL NODO???
