@@ -1,13 +1,23 @@
 -module(gameLogic).
 -compile(export_all).
 
-% M representa la posicion en el tablero
+% M representa la posición en el tablero
 move(M, {T1, T2}, Player) -> case ((M > 0) and (M < 10)) of
                                  true -> Move = trunc(math:pow(2,M-1)),
                                          case validMove(Move, T1, T2) of
                                              true -> case Player of
-                                                         1 -> {Move+T1, T2};            
-                                                         2 -> {T1, Move+T2}                                                     
+                                                         1 -> {NT1,NT2} = {Move+T1, T2};            
+                                                         2 -> {NT1,NT2} = {T1, Move+T2}                                                     
+                                                     end,
+                                                     case (NT1 + NT2) of
+                                                         511 -> case (winGame(NT1)) of
+                                                                    true -> {NT1,NT2};
+                                                                    false -> case (winGame(NT2)) of
+                                                                                 true -> {NT1,NT2};
+                                                                                 false -> {empate, {NT1,NT2}}
+                                                                             end
+                                                                end;  
+                                                         _ -> {NT1,NT2}
                                                      end;
                                              false -> error
                                          end;
@@ -17,19 +27,28 @@ move(M, {T1, T2}, Player) -> case ((M > 0) and (M < 10)) of
 
 validMove(Move, T1, T2) -> (((Move band T2) == 0) and ((Move band T1) == 0)).
 
-%% Asumimos que siempre el movimiento se corresponde al tablero 1 (hacer esto bien en el pcomando)
 
-winGame(X) -> case X of
-                  7 -> true;
-                  273 -> true;
-                  73 -> true;
-                  146 -> true;
-                  84 -> true;
-                  292 -> true;
-                  56 -> true;
-                  448 -> true;
-                  _ -> false
+winGame(X) -> List1 = lists:map(fun(N) -> case (andList(makeIntMatrix(X),makeIntMatrix(N)) == makeIntMatrix(N)) of 
+                                                          true -> 1;
+                                                          false -> 0 
+                                                      end 
+                                          end, [7,273,73,146,84,292,56,448]),
+              case (List1 == [0,0,0,0,0,0,0,0]) of
+                    true -> false;
+                    false -> true
               end.
+              
+
+andList([],[]) -> [];
+andList([X | XS],[Y | YS]) -> [X band Y] ++ andList(XS,YS).
+
+makeIntMatrix(T1) -> ListT1 = lists:map(fun(N) -> case (trunc(math:pow(2, N-1)) band T1) of 
+                                                          0 -> 0;
+                                                          M -> 1 
+                                                      end 
+                                            end, lists:seq(1,9)).
+
+
 
 makeMatrix({T1, T2}) -> ListT1 = lists:map(fun(N) -> case (trunc(math:pow(2, N-1)) band T1) of 
                                                           0 -> integer_to_list(N);
@@ -40,21 +59,13 @@ makeMatrix({T1, T2}) -> ListT1 = lists:map(fun(N) -> case (trunc(math:pow(2, N-1
                                                           0 -> integer_to_list(N);
                                                           M -> "O" 
                                                       end 
+
                                             end, lists:seq(1,9)),
                         ListMerge = lists:map(fun(N) -> case (lists:nth(N, ListT1)) of
                                                             "X" -> "X";
                                                             M -> lists:nth(N, ListT2)
                                                         end
                                               end, lists:seq(1,9)).
-
-printMatrix(ListBoard) -> io:fwrite("~nTablero:~n-------~n~n ~s ~s ~s~n ~s ~s ~s~n ~s ~s ~s~n ~n",[lists:nth(1,ListBoard),lists:nth(2,ListBoard),lists:nth(3,ListBoard),lists:nth(4,ListBoard),lists:nth(5,ListBoard),lists:nth(6,ListBoard),lists:nth(7,ListBoard),lists:nth(8,ListBoard),lists:nth(9,ListBoard)]).
-
-
-                       %  Hacer map numerando los espacios vacios de la union de ambos tableros   
-
-
-
-
 
 
 
